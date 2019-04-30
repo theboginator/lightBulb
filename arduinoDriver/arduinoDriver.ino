@@ -146,7 +146,7 @@ void setAutoOutputs(){ //Set automatic outputs (based off of sensor readings)
   if(!powerStatus){
     lcd.clear();
   }
-  while(!powerStatus){ //If the power swith is off, display an appropriate message
+  while(powerStatus){ //If the power swith is off, display an appropriate message
     //LCD PRINT("Power Switch OFF");  
     lcd.setCursor(0, 0);
     lcd.print("Power Switch OFF");
@@ -177,7 +177,7 @@ void updateDisplay(){
 
 void setRelay(int state){
   if(state == 1){
-    if(digitalRead(garageDoor) > 1){
+    if(digitalRead(garageDoor) > 0){
       digitalWrite(garageDoor, LOW);
       Serial.println("Garage Light ON");
     }
@@ -187,7 +187,7 @@ void setRelay(int state){
     }
   }
   else if (state == 2){
-    if(digitalRead(kitchenLight) > 1){
+    if(digitalRead(kitchenLight) > 0){
       digitalWrite(kitchenLight, LOW);
       Serial.println("Kitchen Light ON");
     }
@@ -197,7 +197,7 @@ void setRelay(int state){
     }   
   }
   else if (state == 3){
-    if(digitalRead(denLight) > 1){
+    if(digitalRead(denLight) > 0){
       digitalWrite(denLight, LOW);
       Serial.println("Den Light ON");
     }
@@ -206,8 +206,8 @@ void setRelay(int state){
       Serial.println("Den Light OFF");
     }
   }
-  else if (state == 3 && !autoLight){
-   if(digitalRead(outdoorLight) > 1){
+  else if (state == 4 && !autoLight){
+   if(digitalRead(outdoorLight) > 0){
       digitalWrite(outdoorLight, LOW);
       Serial.println("Outside Light ON");
     }
@@ -227,7 +227,10 @@ void loop() {
   // Send pin status and current data
   // Check for an instruction in the input buffer
   if(Serial.available()>0){ //If there's a new request load it in
-    request = Serial.read();
+    request = Serial.read() - '0';
+    Serial.print("Recieved code ");
+    Serial.println(request);
+    
     flag = 0;
   }
   if( flag == 0){
