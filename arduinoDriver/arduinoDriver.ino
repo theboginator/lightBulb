@@ -1,6 +1,6 @@
-#include <Wire.h> 
+#include <Wire.h>
 #include <LiquidCrystal_I2C.h>
-LiquidCrystal_I2C lcd(0x27,16,2);  // set the LCD address to 0x27 for a 16 chars and 2 line display
+LiquidCrystal_I2C lcd(0x27, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
 
 int powerSwitch = 12; //Digital input pin shows Power Switch status
 int autoPreference = 11; //Digital input pin to show user preference for auto light control
@@ -19,10 +19,11 @@ int denLight = 5; //Digital output pin to activate the den light
 int outdoorLight = 6; //Digital output pin to activate the outdoor light
 
 int ampReading; //Stores the current value of the ammeter
+int activeDevices;
 double amps; //The current amp draw of the system calculated by ampReading
 
 int ambient; //The current light reading outside (used to control outdoor light in auto)
-int threshold; //The level of ambient light used to control the outdoor light in auto
+int threshold = 99; //The level of ambient light used to control the outdoor light in auto
 
 int numOutputs = 5; //Number of controllable outputs
 int currentStatus[] = {0, 0, 0, 0, 0}; //Current output status
@@ -31,7 +32,7 @@ int newStatus[] = {0, 0, 0, 0, 0}; //Switch requests from bluetooth connection
 int request = 0;
 int flag = 0;
 
-void initializePins(){
+void initializePins() {
   pinMode(interlock, OUTPUT); //configure the interlock relay output pin
   pinMode(garageDoor, OUTPUT); //configure the garage door output pin
   pinMode(kitchenLight, OUTPUT); //configure the kitchen light output pin
@@ -40,7 +41,7 @@ void initializePins(){
   //Set all pins to HIGH so their relays will be OFF:
   setAllOff();
 }
-void testRelays(){
+void testRelays() {
   digitalWrite(outdoorLight, LOW);
   Serial.println("\nTesting Outdoor light... OK");
   delay(1000);
@@ -76,26 +77,23 @@ void setup() {
   Serial.begin(9600); //Setup serial link for communicating with PC or Bluetooth
   // put your setup code here, to run once:
   // SETUP bluetooth
-  lcd.init(); // initialize the lcd 
+  lcd.init(); // initialize the lcd
   lcd.backlight(); //Turn on the LCD backlight
-  lcd.setCursor(0,0);
-  lcd.print("SmartKontrolv0.1");
-  lcd.setCursor(0,1);
+  lcd.setCursor(0, 0);
+  lcd.print("SmartControlv1.0");
+  lcd.setCursor(0, 1);
   delay(1000);
   lcd.print("Hi Everyone");
   pinMode(powerSwitch, INPUT); //A SPDT switch that interrupts the power relay and signals the control it's status
   pinMode(autoPreference, INPUT); //A SPST switch that signals the user's preference for auto/manual outdoor light operation
   pinMode(doorSwitch, INPUT); //A SPST button that signals the garage door being open or closed
-  //pinMode(A5, INPUT); //configure the ammeter on analog pin a5
-  //pinMode(A4, INPUT); //configure the garage door status sensor on analog pin a4
-  //pinMode(A3, INPUT); //configure the ambient light sensor on pin a3
   delay(2000);
   lcd.clear();
-  lcd.setCursor(0,0);
+  lcd.setCursor(0, 0);
   lcd.print("Testing... ");
   lcd.print("Wait");
   initializePins();
-  
+
   lcd.setCursor(0, 1);
   lcd.print("..............");
   testRelays();
@@ -108,33 +106,28 @@ void setup() {
 
 
 
-double toAmps(int ampReading){ //function that converts raw amp draw sensor data into amp value and returns as a double
+double toAmps(int ampReading) { //function that converts raw amp draw sensor data into amp value and returns as a double
   double newamps = 0;
   //Convert ampReading into an amp value store in newamps
   return newamps;
 }
 
-/*
-void updatePins(int[] newStatus){ //Update the outputs with the new requested sensor data recieved over bluetooth link
-  int outputPin = 9;
-  for(int ctr = 0; ctr < newStatusLength; ctr++){
-    if(newStatus[ctr] = 1){
-      digitalWrite((outputPin + ctr), LOW);
-    }
-    else{
-      digitalWrite((outputPin + ctr), HIGH);
-    }
+void readPins() { //Get the status of each pin
+  //powerStatus = digitalRead(powerSwitch); //Read power switch status
+  int reading = digitalRead(powerSwitch);
+  if(reading == 1){
+    powerStatus = !powerStatus;
   }
-}
-*/
-void readPins(){ //Get the status of each pin
-  powerStatus = digitalRead(powerSwitch); //Read power switch status
-  autoLight = digitalRead(autoPreference); //Read auto light switch setting
+  //autoLight = digitalRead(autoPreference); //Read auto light switch setting
+  reading = digitalRead(autoPreference);
+  if(reading == 1){
+    autoLight = !autoLight;
+  }
   ampReading = analogRead(ammeter); //Read amp draw information
   ambient = analogRead(photoCell); //Read photocell value
 }
 
-void setAllOff(){ //Sets each output to OFF
+void setAllOff() { //Sets each output to OFF
   digitalWrite(interlock, HIGH);
   digitalWrite(garageDoor, HIGH);
   digitalWrite(kitchenLight, HIGH);
@@ -142,76 +135,106 @@ void setAllOff(){ //Sets each output to OFF
   digitalWrite(outdoorLight, HIGH);
 }
 
-void setAutoOutputs(){ //Set automatic outputs (based off of sensor readings)
-  if(!powerStatus){
+void setAutoOutputs() { //Set automatic outputs (based off of sensor readings)
+  if (powerStatus) {
     lcd.clear();
   }
-  while(powerStatus){ //If the power swith is off, display an appropriate message
-    //LCD PRINT("Power Switch OFF");  
+  while (powerStatus) { //If the power swith is off, display an appropriate message
+    //LCD PRINT("Power Switch OFF");
     lcd.setCursor(0, 0);
     lcd.print("Power Switch OFF");
-    delay(100);
+    delay(500);
     digitalWrite(interlock, LOW);
     setAllOff();
-    powerStatus = digitalRead(powerSwitch);
+    int reading = digitalRead(powerSwitch);
+    if(reading == 1){
+      powerStatus = !powerStatus;
+    }
   }
-  if(autoLight){ //If the light control is automatic, turn it on or off depending on what the threshold is
-    if(ambient > threshold){
+  if (autoLight) { //If the light control is automatic, turn it on or off depending on what the threshold is
+    if (ambient < threshold) {
       digitalWrite(outdoorLight, LOW); //Turn it on if the ambient light is above threshold
     }
-    else{
+    else {
       digitalWrite(outdoorLight, HIGH); //Turn it off if the ambient light is below threshold
     }
   }
-  
+
 }
 
-void updateDisplay(){
+void updateDisplay() {
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Mode: AUTO");
-  lcd.setCursor(0,1);
-  lcd.print("Amps: ");
-  lcd.print(amps);  
+  lcd.print("Mode:");
+  if (autoLight) {
+    lcd.print("AUTO");
+  }
+  else {
+    lcd.print("MANU");
+  }
+  lcd.print(" SW:");
+  if (digitalRead(outdoorLight) > 0) {
+    lcd.print("OFF");
+  }
+  else {
+    lcd.print(" ON");
+  }
+  lcd.setCursor(0, 1);
+  lcd.print("AMB:");
+  lcd.print(ambient);
+  lcd.print(" Door:");
+  if(digitalRead(doorSwitch) > 0){
+    lcd.print(" CL");
+
+  }
+  else{
+    lcd.print(" OP");
+  }
 }
 
-void setRelay(int state){
-  if(state == 1){
-    if(digitalRead(garageDoor) > 0){
-      digitalWrite(garageDoor, LOW);
-      Serial.println("Garage Light ON");
-    }
-    else{
-      digitalWrite(garageDoor, HIGH);
-      Serial.println("Garage Light OFF");
-    }
+void setRelay(int state) {
+  if (state == 1) {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Signaling");
+    lcd.setCursor(0, 1);
+    lcd.print("Garage Door");
+    Serial.println("Signaling Garage Door.");
+    digitalWrite(garageDoor, LOW);
+    delay(1000);
+    digitalWrite(garageDoor, HIGH);
+    lcd.clear();
+    
   }
-  else if (state == 2){
-    if(digitalRead(kitchenLight) > 0){
+  else if (state == 2) {
+    if (digitalRead(kitchenLight) > 0) {
       digitalWrite(kitchenLight, LOW);
       Serial.println("Kitchen Light ON");
     }
-    else{
+    else {
       digitalWrite(kitchenLight, HIGH);
       Serial.println("Kitchen Light OFF");
-    }   
+    }
   }
-  else if (state == 3){
-    if(digitalRead(denLight) > 0){
+  else if (state == 3) {
+    if (digitalRead(denLight) > 0) {
       digitalWrite(denLight, LOW);
       Serial.println("Den Light ON");
     }
-    else{
+    else {
       digitalWrite(denLight, HIGH);
       Serial.println("Den Light OFF");
     }
   }
-  else if (state == 4 && !autoLight){
-   if(digitalRead(outdoorLight) > 0){
+  else if (state == 4) {
+    if(autoLight){
+      Serial.println("Outside Light is under Automatic Control");
+    }
+    else if (digitalRead(outdoorLight) > 0) {
       digitalWrite(outdoorLight, LOW);
       Serial.println("Outside Light ON");
     }
-    else{
+    else {
       digitalWrite(outdoorLight, HIGH);
       Serial.println("Outside Light OFF");
     }
@@ -226,20 +249,35 @@ void loop() {
   amps = toAmps(ampReading);
   // Send pin status and current data
   // Check for an instruction in the input buffer
-  if(Serial.available()>0){ //If there's a new request load it in
+  if (Serial.available() > 0) { //If there's a new request load it in
     request = Serial.read() - '0';
     Serial.print("Recieved code ");
     Serial.println(request);
-    
+
     flag = 0;
   }
-  if( flag == 0){
+  if ( flag == 0) {
     setRelay(request);
+    Serial.println("Enter 1 to switch Garage Light");
+    Serial.println("Enter 2 to switch Kitchen Light");
+    Serial.println("Enter 3 to switch Den Light");
+    Serial.println("Enter 4 to switch Outside Light");
+    Serial.print("Current Ambient Light Outside: ");
+    Serial.println(ambient);
+    Serial.print("Garage Door: ");
+    if(digitalRead(doorSwitch) > 0){
+      Serial.println("CLOSED");
+    }
+    else{
+      Serial.println("OPEN");
+    }
+    Serial.print("Current Amp Draw: ");
+    Serial.println(amps);
   }
   lcd.clear();
   updateDisplay();
-  
+
   digitalWrite(interlock, LOW);
-  delay(1000);
+  delay(500);
   //LCD Clear
 }
